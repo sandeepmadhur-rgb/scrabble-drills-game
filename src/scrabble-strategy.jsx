@@ -1095,5 +1095,3 @@ export default function ScrabbleTrainer() {
     </div>
   );
 }
-
-export default ScrabbleTrainer;
