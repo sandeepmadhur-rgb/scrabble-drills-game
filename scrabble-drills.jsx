@@ -51,7 +51,7 @@ const WORD_SET = new Set(WORDS.map(w => w.trim().toUpperCase()).filter(w => w.le
 const WORD_LIST = [...WORD_SET].sort((a, b) => a.length - b.length || a.localeCompare(b));
 
 // ─── SCENARIO GENERATION: hand-crafted mid-game board states ────
-// These are realistic mid-game scenarios: all words connected,
+// These are realistic mid-game scenarios: all words connected, 
 // only valid English words, plausible tile placement patterns.
 const SCENARIOS = [
   {
@@ -989,7 +989,7 @@ export default function ScrabbleTrainer() {
         ))}
       </div>
 
-     
+      
       {/* Live score display */}
       {Object.keys(placed).length > 0 && isActive && (
         <div style={{ textAlign: 'center', marginTop: 5, marginBottom: 2 }}>
