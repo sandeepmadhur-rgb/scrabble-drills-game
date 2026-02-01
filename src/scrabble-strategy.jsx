@@ -865,7 +865,7 @@ export default function ScrabbleTrainer() {
           cells.push([r, cc]);
         }
         if (hasPlaced && WORD_SET.has(word)) {
-          wordCells.push({ word, cells, score: scorePlay(word, cells, scenario.board, scenario.premiumsUsed, true) });
+          wordCells.push({ word, cells, horizontal: true });
         }
       }
     }
@@ -887,13 +887,17 @@ export default function ScrabbleTrainer() {
           cells.push([rr, c]);
         }
         if (hasPlaced && WORD_SET.has(word)) {
-          wordCells.push({ word, cells, score: scorePlay(word, cells, scenario.board, scenario.premiumsUsed, false) });
+          wordCells.push({ word, cells, horizontal: false });
         }
       }
     }
-    wordCells.forEach(({ word, cells, score }) => {
+    
+    // Score each word individually (without cross-word bonuses to avoid double-counting in display)
+    wordCells.forEach(({ word, cells, horizontal }) => {
       cells.forEach(([r,c]) => validWordCells.add(r+','+c));
-      liveScore += score;
+      // Use scoreOneWord instead of scorePlay to avoid double-counting cross-words
+      const wordScore = scoreOneWord(word, cells, scenario.board, scenario.premiumsUsed);
+      liveScore += wordScore;
       liveWords.push(word);
     });
   }
