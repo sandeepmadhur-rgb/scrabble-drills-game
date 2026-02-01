@@ -142,12 +142,18 @@ function buildConnectedBoard() {
   }
 
   function placeWord(word, row, col, horizontal) {
+    // Validate the word is in our dictionary before placing
+    if (!WORD_SET.has(word)) {
+      console.warn(`Skipping invalid word: ${word}`);
+      return false;
+    }
     for (let i = 0; i < word.length; i++) {
       const r = horizontal ? row : row + i;
       const c = horizontal ? col + i : col;
       board[r][c] = word[i];
       premiumsUsed[`${r},${c}`] = true;
     }
+    return true;
   }
 
   function sharesLetter(word, row, col, horizontal) {
@@ -177,9 +183,10 @@ function buildConnectedBoard() {
     // Place horizontally centered on row 7
     const col = 7 - Math.floor(w.length / 2);
     if (col >= 0 && col + w.length <= 15) {
-      placeWord(w, 7, col, true);
-      placed = true;
-      break;
+      if (placeWord(w, 7, col, true)) {
+        placed = true;
+        break;
+      }
     }
   }
   if (!placed) return null;
@@ -607,9 +614,42 @@ function validatePlacement(board, placed, premiumsUsed) {
     return { valid: false, error: `"${word}" is not a valid word.` };
   }
 
-  // Must touch at least one pre-existing tile
-  if (!wordPositions.some(p => board[p.r][p.c] !== null))
+  // Must touch at least one pre-existing tile OR form a valid cross-word
+  const touchesExisting = wordPositions.some(p => board[p.r][p.c] !== null);
+  
+  // Check if any NEW tile forms a cross-word (which counts as connection)
+  let formsValidCrossWord = false;
+  for (const { r, c, letter } of wordPositions) {
+    if (board[r][c] !== null) continue; // pre-existing tile, skip
+    
+    // Check for perpendicular words formed
+    let cw = '';
+    if (isH) {
+      let cr = r;
+      while (cr > 0 && board[cr - 1][c] !== null) cr--;
+      while (cr < 15) {
+        const ch = (cr === r) ? letter : board[cr][c];
+        if (ch === null) break;
+        cw += ch; cr++;
+      }
+    } else {
+      let cc = c;
+      while (cc > 0 && board[r][cc - 1] !== null) cc--;
+      while (cc < 15) {
+        const ch = (cc === c) ? letter : board[r][cc];
+        if (ch === null) break;
+        cw += ch; cc++;
+      }
+    }
+    if (cw.length > 1 && WORD_SET.has(cw)) {
+      formsValidCrossWord = true;
+      break;
+    }
+  }
+  
+  if (!touchesExisting && !formsValidCrossWord) {
     return { valid: false, error: "Your word must connect to the existing board." };
+  }
 
   // Validate all cross-words
   for (const { r, c, letter } of wordPositions) {
@@ -1095,3 +1135,5 @@ export default function ScrabbleTrainer() {
     </div>
   );
 }
+
+export default ScrabbleTrainer;
