@@ -33,7 +33,9 @@ export default function ScrabbleTrainer() {
   const [stats, setStats] = useState({ played: 0, offOk: 0, defOk: 0 });
   const [loading, setLoading] = useState(true);
   const [drag, setDrag] = useState(null);
+  const [rackOrder, setRackOrder] = useState([0,1,2,3,4,5,6]); // Track rack arrangement
   const boardRef = useRef(null);
+  const rackRef = useRef(null);
 
   // Load TWL06 dictionary on mount
   useEffect(() => {
@@ -220,6 +222,49 @@ export default function ScrabbleTrainer() {
       }
     }
 
+    // Final validation: check all words on board are valid
+    const allWordsValid = [];
+    // Check horizontal words
+    for (let r = 0; r < 15; r++) {
+      let c = 0;
+      while (c < 15) {
+        if (board[r][c] === null) { c++; continue; }
+        let start = c;
+        let word = '';
+        while (c < 15 && board[r][c] !== null) {
+          word += board[r][c];
+          c++;
+        }
+        if (word.length >= 2) {
+          if (!WORD_SET.has(word)) {
+            console.error(`Invalid horizontal word on board: ${word}`);
+            return null; // Reject this board
+          }
+          allWordsValid.push(word);
+        }
+      }
+    }
+    // Check vertical words
+    for (let c = 0; c < 15; c++) {
+      let r = 0;
+      while (r < 15) {
+        if (board[r][c] === null) { r++; continue; }
+        let start = r;
+        let word = '';
+        while (r < 15 && board[r][c] !== null) {
+          word += board[r][c];
+          r++;
+        }
+        if (word.length >= 2) {
+          if (!WORD_SET.has(word)) {
+            console.error(`Invalid vertical word on board: ${word}`);
+            return null; // Reject this board
+          }
+          allWordsValid.push(word);
+        }
+      }
+    }
+    
     return { board, premiumsUsed };
   }, [WORD_LIST, WORD_SET]);
 
@@ -627,6 +672,7 @@ export default function ScrabbleTrainer() {
     setLoading(true);
     setPlaced({}); setSelRack(null); setRound('offense');
     setOffResult(null); setDefResult(null); setError(null); setDrag(null);
+    setRackOrder([0,1,2,3,4,5,6]); // Reset rack arrangement
     setTimeout(() => {
       let s = null;
       for (let i = 0; i < 40; i++) { s = generateScenario(); if (s) break; }
@@ -663,6 +709,18 @@ export default function ScrabbleTrainer() {
     return null;
   };
 
+  const hitTestRack = (x, y) => {
+    if (!rackRef.current) return null;
+    const children = Array.from(rackRef.current.children);
+    for (let i = 0; i < children.length; i++) {
+      const rect = children[i].getBoundingClientRect();
+      if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+        return i; // Return display position
+      }
+    }
+    return null;
+  };
+
   const doPlace = (rackIdx, r, c) => {
     if (round === 'done') return;
     if (scenario.board[r][c] !== null) return;
@@ -678,25 +736,50 @@ export default function ScrabbleTrainer() {
     setError(null);
   };
 
-  const onRackPointerDown = (e, idx) => {
-    if (rackUsed[idx] || round === 'done') return;
+  const onRackPointerDown = (e, displayPos) => {
+    const actualIdx = rackOrder[displayPos];
+    if (rackUsed[actualIdx] || round === 'done') return;
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
-    setDrag({ idx, x: e.clientX, y: e.clientY, startedOnRack: true });
-    setSelRack(idx);
+    setDrag({ idx: actualIdx, displayPos, x: e.clientX, y: e.clientY, startedOnRack: true });
+    setSelRack(actualIdx);
   };
 
   const onPointerMove = (e) => {
     if (!drag) return;
     e.preventDefault();
-    setDrag(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
+    setDrag(prev => {
+      if (!prev) return null;
+      const rackPos = hitTestRack(e.clientX, e.clientY);
+      return { ...prev, x: e.clientX, y: e.clientY, hoverRackPos: rackPos };
+    });
   };
 
   const onPointerUp = (e) => {
     if (!drag) return;
     e.preventDefault();
+    
+    // Check if dropped on rack (for rearranging)
+    const rackPos = hitTestRack(e.clientX, e.clientY);
+    if (rackPos !== null && rackPos !== drag.displayPos) {
+      // Swap tiles in rack
+      setRackOrder(prev => {
+        const newOrder = [...prev];
+        const temp = newOrder[drag.displayPos];
+        newOrder[drag.displayPos] = newOrder[rackPos];
+        newOrder[rackPos] = temp;
+        return newOrder;
+      });
+      setDrag(null);
+      return;
+    }
+    
+    // Check if dropped on board (for placing)
     const cell = hitTestBoard(e.clientX, e.clientY);
-    if (cell) doPlace(drag.idx, cell.r, cell.c);
+    if (cell) {
+      const actualIdx = rackOrder[drag.displayPos];
+      doPlace(actualIdx, cell.r, cell.c);
+    }
     setDrag(null);
   };
 
@@ -705,13 +788,14 @@ export default function ScrabbleTrainer() {
     const key = `${r},${c}`;
     if (placed[key]) { doPickUp(r, c); return; }
     if (selRack !== null && scenario.board[r][c] === null) {
-      doPlace(selRack, r, c);
+      doPlace(selRack, r, c); // selRack is already the actual index
     }
   };
 
-  const onRackClick = (idx) => {
-    if (rackUsed[idx] || round === 'done') return;
-    setSelRack(selRack === idx ? null : idx);
+  const onRackClick = (displayPos) => {
+    const actualIdx = rackOrder[displayPos];
+    if (rackUsed[actualIdx] || round === 'done') return;
+    setSelRack(selRack === actualIdx ? null : actualIdx);
   };
 
   const onSubmit = () => {
@@ -904,21 +988,23 @@ export default function ScrabbleTrainer() {
       </div>
 
       <div style={{ textAlign: 'center', fontSize: 9, color: '#555', letterSpacing: 1.5, textTransform: 'uppercase', marginTop: 7 }}>Your Rack</div>
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 3, margin: '3px 0' }}>
-        {scenario.rack.map((t, idx) => {
-          const used = rackUsed[idx];
-          const isSel = selRack === idx;
+      <div ref={rackRef} style={{ display: 'flex', justifyContent: 'center', gap: 3, margin: '3px 0' }}>
+        {rackOrder.map((actualIdx, displayPos) => {
+          const t = scenario.rack[actualIdx];
+          const used = rackUsed[actualIdx];
+          const isSel = selRack === actualIdx;
+          const isHovered = drag && drag.hoverRackPos === displayPos && drag.displayPos !== displayPos;
           return (
             <div
-              key={idx}
-              onClick={() => onRackClick(idx)}
-              onPointerDown={(e) => onRackPointerDown(e, idx)}
+              key={displayPos}
+              onClick={() => onRackClick(displayPos)}
+              onPointerDown={(e) => onRackPointerDown(e, displayPos)}
               style={{
                 width: 38, height: 42,
                 background: used ? '#2a2a2a' : 'linear-gradient(160deg,#f0dcc0 0%,#c9a44a 100%)',
                 borderRadius: 4,
-                border: `2px solid ${isSel ? '#fff' : used ? '#444' : '#a07830'}`,
-                boxShadow: isSel ? '0 0 10px rgba(255,255,255,0.5)' : '0 2px 4px rgba(0,0,0,0.35)',
+                border: `2px solid ${isHovered ? '#27ae60' : isSel ? '#fff' : used ? '#444' : '#a07830'}`,
+                boxShadow: isHovered ? '0 0 12px rgba(39,174,96,0.6)' : isSel ? '0 0 10px rgba(255,255,255,0.5)' : '0 2px 4px rgba(0,0,0,0.35)',
                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                 cursor: used ? 'default' : 'pointer',
                 opacity: used ? 0.35 : 1,
