@@ -682,6 +682,8 @@ function validatePlacement(board, placed, premiumsUsed) {
 
 // ─── REACT APP ──────────────────────────────────────────────────
 export default function ScrabbleTrainer() {
+  const [WORD_SET, setWordSet] = useState(new Set());
+  const [isLoadingDict, setIsLoadingDict] = useState(true);
   const [scenario, setScenario] = useState(null);
   const [placed, setPlaced] = useState({});          // "r,c" -> letter
   const [selRack, setSelRack] = useState(null);      // index into rack, or null
