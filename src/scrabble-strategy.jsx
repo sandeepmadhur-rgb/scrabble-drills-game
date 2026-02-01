@@ -824,10 +824,11 @@ export default function ScrabbleTrainer() {
   const premColors = { TW: '#c0392b', DW: '#e67e22', TL: '#2980b9', DL: '#5dade2' };
   const premLabels = { TW: '3×\nWORD', DW: '2×\nWORD', TL: '3×\nLTR', DL: '2×\nLTR' };
 
-  if (loading || !scenario) return (
+if (loading || !scenario || isLoadingDict) return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1a1a2e' }}>
       <div style={{ color: '#d4a843', fontSize: 22, textAlign: 'center', fontFamily: "'Palatino Linotype',serif" }}>
-        <div style={{ fontSize: 38, marginBottom: 10 }}>🔤</div>Generating scenario…
+        <div style={{ fontSize: 38, marginBottom: 10 }}>🔤</div>
+        {isLoadingDict ? 'Loading dictionary...' : 'Generating scenario…'}
       </div>
     </div>
   );
